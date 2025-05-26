@@ -1,0 +1,149 @@
+import numpy as np
+import skfuzzy as fuzz
+from skfuzzy import control as ctrl
+import matplotlib.pyplot as plt
+
+# Definindo variáveis de entrada
+OF = ctrl.Antecedent(np.arange(57, 63.1, 0.1), 'Oscilacao_Frequencia')
+TA = ctrl.Antecedent(np.arange(-20, 61, 1), 'Temperatura_Ambiente')
+AE = ctrl.Antecedent(np.arange(0.01, 0.21, 0.01), 'Alinhamento_Eixo')
+RA = ctrl.Antecedent(np.arange(60, 78.1, 0.1), 'Ruido_Acustico')
+TO = ctrl.Antecedent(np.arange(0, 49, 1), 'Tempo_Operacao')
+
+# Variável de saída
+Risco = ctrl.Consequent(np.arange(0, 101, 1), 'Risco_Falha')
+
+# Funções de pertinência - Oscilação de Frequência
+OF['baixa'] = fuzz.trimf(OF.universe, [57, 58, 59])
+OF['normal'] = fuzz.trimf(OF.universe, [59, 60, 61])
+OF['alta'] = fuzz.trimf(OF.universe, [61, 62, 63])
+
+# Temperatura Ambiente
+TA['normal'] = fuzz.trimf(TA.universe, [-20, 10, 40])
+TA['atencao'] = fuzz.trimf(TA.universe, [40, 45, 50])
+TA['critica'] = fuzz.trimf(TA.universe, [50, 55, 60])
+
+# Alinhamento do Eixo
+AE['normal'] = fuzz.trimf(AE.universe, [0.01, 0.03, 0.05])
+AE['atencao'] = fuzz.trimf(AE.universe, [0.05, 0.075, 0.10])
+AE['critico'] = fuzz.trimf(AE.universe, [0.10, 0.15, 0.20])
+
+# Ruído Acústico
+RA['baixo'] = fuzz.trimf(RA.universe, [60, 63, 66])
+RA['normal'] = fuzz.trimf(RA.universe, [64, 68, 72])
+RA['alto'] = fuzz.trimf(RA.universe, [70, 74, 78])
+
+# Tempo de Operação Contínua
+TO['normal'] = fuzz.trimf(TO.universe, [0, 4, 8])
+TO['atencao'] = fuzz.trimf(TO.universe, [8, 16, 24])
+TO['critico'] = fuzz.trimf(TO.universe, [24, 36, 48])
+
+# Risco de Falha
+Risco['baixo'] = fuzz.trimf(Risco.universe, [0, 20, 40])
+Risco['medio'] = fuzz.trimf(Risco.universe, [30, 50, 70])
+Risco['alto'] = fuzz.trimf(Risco.universe, [60, 80, 100])
+
+# Regras fuzzy
+rule1 = ctrl.Rule(OF['normal'] & TA['normal'] & AE['normal'] & RA['baixo'] & TO['normal'], Risco['baixo'])
+rule2 = ctrl.Rule(OF['baixa'] | OF['alta'], Risco['medio'])
+rule3 = ctrl.Rule(TA['critica'], Risco['alto'])
+rule4 = ctrl.Rule(AE['critico'], Risco['alto'])
+rule5 = ctrl.Rule(RA['alto'], Risco['medio'])
+rule6 = ctrl.Rule(TO['critico'], Risco['alto'])
+rule7 = ctrl.Rule(OF['alta'] & RA['alto'], Risco['alto'])
+rule8 = ctrl.Rule(TA['atencao'] & TO['atencao'], Risco['medio'])
+rule9 = ctrl.Rule(AE['atencao'] & RA['normal'], Risco['medio'])
+rule10 = ctrl.Rule(OF['baixa'] & TA['critica'], Risco['alto'])
+
+# Criando sistema e simulador
+sistema_risco = ctrl.ControlSystem([rule1, rule2, rule3, rule4, rule5, rule6, rule7, rule8, rule9, rule10])
+simulador = ctrl.ControlSystemSimulation(sistema_risco)
+
+# Entrada de dados do usuário
+of = float(input("Informe a Oscilação de Frequência na Rede Elétrica (57 a 63 Hz): "))
+ta = float(input("Informe a Temperatura Ambiente (em °C, de -20 a 60): "))
+ae = float(input("Informe o Alinhamento do Eixo (em mm, 0.01 a 0.2): "))
+ra = float(input("Informe o Ruído Acústico (em dB, 60 a 78): "))
+to = float(input("Informe o Tempo de Operação Contínua (em horas, 0 a 48): "))
+
+# Passando valores para o simulador
+simulador.input['Oscilacao_Frequencia'] = of
+simulador.input['Temperatura_Ambiente'] = ta
+simulador.input['Alinhamento_Eixo'] = ae
+simulador.input['Ruido_Acustico'] = ra
+simulador.input['Tempo_Operacao'] = to
+
+# Calculando
+simulador.compute()
+
+# Resultado
+risco_calculado = simulador.output['Risco_Falha']
+print(f"\nRisco de falha calculado: {risco_calculado:.2f}%")
+
+# Classificação qualitativa
+if risco_calculado < 35:
+    classificacao = "Baixo risco"
+elif 35 <= risco_calculado < 70:
+    classificacao = "Médio risco"
+else:
+    classificacao = "Alto risco"
+
+print(f"Classificação: {classificacao}")
+
+# Diagnóstico automático completo
+print("\nDiagnóstico automático:")
+
+# Oscilação de Frequência
+if of < 59:
+    print("- Frequência: Baixa - risco de perda de torque e aquecimento.")
+elif of <= 61:
+    print("- Frequência: Normal - operação ideal.")
+else:
+    print("- Frequência: Alta - risco de vibração e desgaste.")
+
+# Temperatura Ambiente
+if ta > 50:
+    print("- Temperatura: Crítica - risco de superaquecimento e falha.")
+elif ta > 40:
+    print("- Temperatura: Elevada - atenção para dissipação de calor.")
+else:
+    print("- Temperatura: Normal - operação segura.")
+
+# Alinhamento do Eixo
+if ae > 0.10:
+    print("- Alinhamento: Crítico - risco de falhas mecânicas.")
+elif ae > 0.05:
+    print("- Alinhamento: Atenção - possibilidade de vibrações.")
+else:
+    print("- Alinhamento: Adequado - operação estável.")
+
+# Ruído Acústico
+if ra > 70:
+    print("- Ruído: Elevado - possível desgaste ou desalinhamento.")
+elif ra >= 64:
+    print("- Ruído: Normal - dentro dos padrões esperados.")
+else:
+    print("- Ruído: Baixo - operação silenciosa e estável.")
+
+# Tempo de Operação
+if to > 24:
+    print("- Tempo de Operação: Crítico - risco elevado de superaquecimento.")
+elif to > 8:
+    print("- Tempo de Operação: Prolongado - atenção ao acúmulo de calor.")
+else:
+    print("- Tempo de Operação: Normal - dentro da capacidade nominal.")
+
+# Gráfico
+fig, ax = plt.subplots(figsize=(8, 5))
+ax.plot(Risco.universe, Risco['baixo'].mf, 'b', label='Baixo')
+ax.plot(Risco.universe, Risco['medio'].mf, 'g', label='Médio')
+ax.plot(Risco.universe, Risco['alto'].mf, 'r', label='Alto')
+ax.axvline(risco_calculado, color='k', linestyle='--', label=f'Saída: {risco_calculado:.2f}%')
+ax.set_title('Risco de Falha')
+ax.legend(loc='upper right')
+plt.grid(True)
+plt.show()
+
+#As funções de pertinência adotadas neste sistema são triangulares, escolhidas por sua simplicidade de implementação, facilidade de visualização e clareza na interpretação dos limites entre os estados qualitativos. Esse formato permite definir os conjuntos fuzzy de maneira direta e intuitiva, facilitando tanto o desenvolvimento quanto a análise dos resultados, sendo especialmente adequado para sistemas de monitoramento com variáveis que possuem limites bem estabelecidos, como é o caso deste projeto.
+
+#A análise dos resultados obtidos demonstra que o sistema apresenta coerência, classificando adequadamente o risco de falha com base nas variáveis de entrada, conforme o esperado. Sua aplicação potencial está na área de manutenção preditiva de motores elétricos, auxiliando na tomada de decisões preventivas e na redução de falhas operacionais. Contudo, uma limitação observada é a dependência de funções de pertinência simples e de um conjunto fixo de regras, o que pode restringir a precisão em cenários mais complexos ou com variabilidade elevada dos parâmetros; além disso, o sistema não aprende ou se adapta automaticamente a novos dados.
